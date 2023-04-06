@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>LaunchTrak Web</title>
+  <link rel="stylesheet" type="text/css" rel="noopener" target="_blank" href="style.css">
+</head>
+<body>
+<button onclick="connectSerial()">Connect</button>
+Baud:
+<input type="text" id="baud" list="baudList" placeholder = "115200" style="width: 10ch;" onclick="this.value = ''"
+    onchange="localStorage.baud = this.value">
+<datalist id="baudList">
+    <option value="110">110</option>
+    <option value="300">300</option>
+    <option value="600">600</option>
+    <option value="1200">1200</option>
+    <option value="2400">2400</option>
+    <option value="4800">4800</option>
+    <option value="9600">9600</option>
+    <option value="14400">14400</option>
+    <option value="19200">19200</option>
+    <option value="38400">38400</option>
+    <option value="57600">57600</option>
+    <option value="115200">115200</option>
+    <option value="128000">128000</option>
+    <option value="256000">256000</option>
+</datalist>
+
+<br>
+<div id = "commands">
+    <button id = "refreshButton" onclick="refreshFiles()">
+        Load Files
+    </button>
+    Select File :
+    <input type="text" id="filename" list="filenames" style="width: 10ch;" onclick="this.value = ''" onchange="localStorage.filename = this.value">
+    <datalist id="filenames"></datalist>
+    <button onclick="viewFileData()">
+        View Data
+    </button>
+    <button onclick="downloadFileData()">
+        Download Data
+    </button>
+    <button onclick="clearData()">Clear Data</button>
+    <button onclick="viewTable()">
+        View Table
+    </button>
+    <button onclick="clearTable()">
+        Clear Table
+    </button>
+</div>
+<br>
+
+<div id="serialResults">
+</div>
+<br>
+<table>
+</table>
+<script>
+    var port, textEncoder, writableStreamClosed, writer = -1;
+    // 0 = Load Files, 1 = Open File
+    var mode = 0;
+    const filenames = [];
+    var next = 0;
+    var printFile = false;
+    var currentDataString = "";
+    async function connectSerial() {
+        try {
+            port = await navigator.serial.requestPort();
+            await port.open({ baudRate: document.getElementById("baud").value });
+            let settings = {};
+
+            settings.dataTerminalReady = true;
+            settings.requestToSend = true;
+            if (Object.keys(settings).length > 0) await port.setSignals(settings);
+  
+            
+            textEncoder = new TextEncoderStream();
+            writableStreamClosed = textEncoder.readable.pipeTo(port.writable);
+            writer = textEncoder.writable.getWriter();
+            await listenToPort();
+        } catch (e){
+            alert("Serial Connection Failed" + e);
+        }
+    }
+    async function sendSerialLine() {
+        dataToSend = document.getElementById("lineToSend").value;
+        dataToSend = dataToSend + "\r";
+        //appendToTerminal("> " + dataToSend);
+        await writer.write(dataToSend);
+        if (dataToSend.trim().startsWith('\x03')) echo(false);
+        document.getElementById("lineToSend").value = "";
+        document.getElementById("lineToSend").value = "";
+    }
+    async function refreshFiles() {
+        dataToSend = "L";
+        mode = 0;
+        dataToSend = dataToSend + "\r";
+        //appendToTerminal("> " + dataToSend);
+        await writer.write(dataToSend);
+        if (dataToSend.trim().startsWith('\x03')) echo(false);
+    }
+    async function viewFileData(){
+        dataToSend = "B";
+        mode = 1;
+        dataToSend = dataToSend + "\r";
+        //appendToTerminal("> " + dataToSend);
+        await writer.write(dataToSend);
+        if (dataToSend.trim().startsWith('\x03')) echo(false);
+        await delay(1000);
+        openFile();
+        await delay(1000);
+        dumpFile();
+        await delay(1000);
+        mode = 0;
+        currentDataString = serialResultsDiv.innerText;
+    }
+    async function openFile(){
+        dataToSend = localStorage.filename;
+        dataToSend = dataToSend.substring(3,6);
+        dataToSend = dataToSend + "\r";
+        //appendToTerminal("> " + dataToSend);
+        await writer.write(dataToSend);
+        if (dataToSend.trim().startsWith('\x03')) echo(false);
+    }
+    async function dumpFile(){
+        dataToSend = "H";
+        dataToSend = dataToSend + "\r";
+        //appendToTerminal("> " + dataToSend);
+        await writer.write(dataToSend);
+        if (dataToSend.trim().startsWith('\x03')) echo(false);
+    }
+    async function downloadFileData(){
+        await save(localStorage.filename + ".txt",serialResultsDiv.innerText);
+    }
+    function save(filename, data) {
+        const blob = new Blob([data], {type: 'text/csv'});
+        if(window.navigator.msSaveOrOpenBlob) {
+            window.navigator.msSaveBlob(blob, filename);
+        }
+        else{
+            const elem = window.document.createElement('a');
+            elem.href = window.URL.createObjectURL(blob);
+            elem.download = filename;        
+            document.body.appendChild(elem);
+            elem.click();        
+            document.body.removeChild(elem);
+        }
+    }
+    async function viewTable(){
+        console.log("generate table");
+        let table = document.querySelector("table");
+        var dataArray = currentDataString.split('\n');
+        console.log(dataArray.length);
+        var data = [];
+        let i = 0;
+        for(line in dataArray){
+            if(i == 0){
+                i = 1;
+                continue;
+            }
+            if(line.length < 20){
+                continue;
+            }
+            var lineArray = line.split(',');
+            data.push(
+                {
+                "Time(us)" : lineArray[0],
+                "Roll(deg)" : lineArray[1],
+                "Pitch(deg)": lineArray[2],
+                "Yaw(deg)" : lineArray[3],
+                "AccX(m/s/s)" : lineArray[4],
+                "AccY(m/s/s)" : lineArray[5],
+                "AccZ(m/s/s)" : lineArray[6],
+                "Press(Pa)" : lineArray[7],
+                "Temp(C)" : lineArray[8],
+                "HGX(g)" : lineArray[9],
+                "HGY(g)" : lineArray[10],
+                "HGZ(g)" : lineArray[11],
+                }
+            )
+        }
+        console.log("Data length" + data.length);
+        generateTableHead(table, Object.keys(data[0]))
+        generateTable(table, data);
+    }
+    function generateTableHead(table, data) {
+        let thead = table.createTHead();
+        let row = thead.insertRow();
+        for (let key of data) {
+            let th = document.createElement("th");
+            let text = document.createTextNode(key);
+            th.appendChild(text);
+            row.appendChild(th);
+        }
+    }
+    function generateTable(table, data) {
+        for (let element of data) {
+            let row = table.insertRow();
+            for (key in element) {
+            let cell = row.insertCell();
+            let text = document.createTextNode(element[key]);
+            cell.appendChild(text);
+            }
+        }
+    }
+    function delay(time) {
+        return new Promise(resolve => setTimeout(resolve, time));
+    }
+    function clearData(){
+        serialResultsDiv.innerHTML = '';
+        printFile = false;
+    }
+    async function listenToPort() {
+        const textDecoder = new TextDecoderStream();
+        const readableStreamClosed = port.readable.pipeTo(textDecoder.writable);
+        const reader = textDecoder.readable.getReader();
+
+        // Listen to data coming from the serial device.
+        while (true) {
+            const { value, done } = await reader.read();
+            if (done) {
+                // Allow the serial port to be closed later.
+                console.log('[readLoop] DONE', done);
+                reader.releaseLock();
+                break;
+            }
+            if(mode == 0){
+                console.log("Done loading files\n");
+                console.log(value);
+                var list = document.getElementById('filenames');
+                const fileArray = value.split(" ");
+                fileArray.forEach(function(item){
+                    if(!filenames.includes(item) && item.startsWith("ltk")){
+                        item = item.substring(0,10);
+                        var option = document.createElement('option');
+                        option.value = item;
+                        list.appendChild(option);
+                        filenames.push(value);
+                    }
+                });
+            }
+            if(mode == 1){
+                if(value.startsWith('@')){
+                    printFile = !printFile;
+                    await delay(100);
+                }
+                else if(printFile){
+                    appendToTerminal(value);
+                }
+            }
+        }
+    }
+    const serialResultsDiv = document.getElementById("serialResults");
+    async function appendToTerminal(newStuff) {
+        serialResultsDiv.innerHTML += newStuff;
+    }
+    document.getElementById("baud").value = (localStorage.baud == undefined ? 115200 : localStorage.baud);
+</script>
+
+<div>
+    <canvas id="myChart"></canvas>
+  </div>
+  
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  
+  <script>
+    const ctx = document.getElementById('myChart');
+  
+    new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: ['Red', 'Blue', 'Yellow', 'Green', 'Purple', 'Orange'],
+        datasets: [{
+          label: '# of Votes',
+          data: [12, 19, 3, 5, 2, 3],
+          borderWidth: 1
+        }]
+      },
+      options: {
+        scales: {
+          y: {
+            beginAtZero: true
+          }
+        }
+      }
+    });
+  </script>
+</body>
+</html>

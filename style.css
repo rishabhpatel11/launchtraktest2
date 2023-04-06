@@ -1,0 +1,17 @@
+*{
+   margin-top: 5px; 
+}
+#serialResults {
+    white-space: pre;
+    height: calc(100% - 120px);
+    width: calc(100% - 20px);
+    border-style: solid;
+    border-color: black;
+    border-width: 1px;
+    overflow: scroll;
+    padding: 10px;
+    margin: 0px;
+}
+table *{
+    border-style: solid;
+}
