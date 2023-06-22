@@ -47,6 +47,9 @@ Baud:
     <button onclick="clearTable()">
         Clear Table
     </button>
+    <button onclick="loadGraph()">
+        View Graph
+    </button>
 </div>
 <br>
 
@@ -63,6 +66,8 @@ Baud:
     var next = 0;
     var printFile = false;
     var currentDataString = "";
+    var data = [];
+    var rawData = "";
     async function connectSerial() {
         try {
             port = await navigator.serial.requestPort();
@@ -89,7 +94,6 @@ Baud:
         await writer.write(dataToSend);
         if (dataToSend.trim().startsWith('\x03')) echo(false);
         document.getElementById("lineToSend").value = "";
-        document.getElementById("lineToSend").value = "";
     }
     async function refreshFiles() {
         dataToSend = "L";
@@ -108,11 +112,12 @@ Baud:
         if (dataToSend.trim().startsWith('\x03')) echo(false);
         await delay(1000);
         openFile();
-        await delay(1000);
+        await delay(3000);
         dumpFile();
-        await delay(1000);
+        await delay(2000);
         mode = 0;
         currentDataString = serialResultsDiv.innerText;
+        currentDataString = rawData;
     }
     async function openFile(){
         dataToSend = localStorage.filename;
@@ -149,37 +154,48 @@ Baud:
     async function viewTable(){
         console.log("generate table");
         let table = document.querySelector("table");
-        var dataArray = currentDataString.split('\n');
+        //var dataArray = document.getElementById("serialResults").innerText.split('\n');
+        var dataArray = rawData.split('\n');
         console.log(dataArray.length);
-        var data = [];
-        let i = 0;
-        for(line in dataArray){
-            if(i == 0){
-                i = 1;
-                continue;
-            }
-            if(line.length < 20){
-                continue;
-            }
-            var lineArray = line.split(',');
-            data.push(
-                {
-                "Time(us)" : lineArray[0],
-                "Roll(deg)" : lineArray[1],
-                "Pitch(deg)": lineArray[2],
-                "Yaw(deg)" : lineArray[3],
-                "AccX(m/s/s)" : lineArray[4],
-                "AccY(m/s/s)" : lineArray[5],
-                "AccZ(m/s/s)" : lineArray[6],
-                "Press(Pa)" : lineArray[7],
-                "Temp(C)" : lineArray[8],
-                "HGX(g)" : lineArray[9],
-                "HGY(g)" : lineArray[10],
-                "HGZ(g)" : lineArray[11],
+        console.log(dataArray[20]);
+        for(let i = 0; i < dataArray.length - 5; i++){
+                var lineArray = dataArray[i].split(',');
+                //console.log(lineArray.length);
+                let d = 0;
+                if(lineArray.length > 11){
+                    if(lineArray[0].match(/^\d/)){
+                        let accel = Math.sqrt(lineArray[4]*lineArray[4] + lineArray[5]*lineArray[5] + lineArray[6]*lineArray[6]);
+                        if(lineArray[4] < 0 ){
+                            accel *= -1;
+                        }
+                        let prevVelocity = 0;
+                        if(d > 0){
+                            prevVelocity = data[d - 1].v;
+                        }
+                        data.push(
+                            {
+                            time : lineArray[0]/1000000,
+                            roll : lineArray[1],
+                            pitch: lineArray[2],
+                            yaw : lineArray[3],
+                            ax : lineArray[4],
+                            ay : lineArray[5],
+                            az : lineArray[6],
+                            press : lineArray[7],
+                            temp : lineArray[8],
+                            hgx: lineArray[9],
+                            hgy : lineArray[10],
+                            hgz : lineArray[11],
+                            a : accel,
+                            v : accel*lineArray[0]/1000000 + prevVelocity, 
+                            }
+                        )
+                        d = d + 1;
+                    }
                 }
-            )
-        }
-        console.log("Data length" + data.length);
+            }
+        console.log("Data length: " + data.length);
+        console.log(data[0]);
         generateTableHead(table, Object.keys(data[0]))
         generateTable(table, data);
     }
@@ -208,6 +224,7 @@ Baud:
     }
     function clearData(){
         serialResultsDiv.innerHTML = '';
+        rawData = '';
         printFile = false;
     }
     async function listenToPort() {
@@ -225,8 +242,9 @@ Baud:
                 break;
             }
             if(mode == 0){
-                console.log("Done loading files\n");
-                console.log(value);
+                //console.log("Done loading files\n");
+                //console.log(value);
+                await delay(500);
                 var list = document.getElementById('filenames');
                 const fileArray = value.split(" ");
                 fileArray.forEach(function(item){
@@ -252,38 +270,52 @@ Baud:
     }
     const serialResultsDiv = document.getElementById("serialResults");
     async function appendToTerminal(newStuff) {
-        serialResultsDiv.innerHTML += newStuff;
+        serialResultsDiv.innerHTML = "Done";
+        rawData += newStuff;
     }
     document.getElementById("baud").value = (localStorage.baud == undefined ? 115200 : localStorage.baud);
 </script>
 
 <div>
-    <canvas id="myChart"></canvas>
+    <canvas id="Acceleration"></canvas>
+    <canvas id="Velocity"></canvas>
   </div>
   
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   
   <script>
-    const ctx = document.getElementById('myChart');
-  
-    new Chart(ctx, {
-      type: 'line',
-      data: {
-        labels: ['Red', 'Blue', 'Yellow', 'Green', 'Purple', 'Orange'],
-        datasets: [{
-          label: '# of Votes',
-          data: [12, 19, 3, 5, 2, 3],
-          borderWidth: 1
-        }]
-      },
-      options: {
-        scales: {
-          y: {
-            beginAtZero: true
-          }
-        }
-      }
-    });
+    var ctx1 = null
+    var ctx2 = null
+    function loadGraph(){
+        ctx1 = document.getElementById('Acceleration');
+        ctx2 = document.getElementById('Velocity');
+        new Chart("Acceleration", {
+            type: "line",
+            data: {
+                labels: data.map(row => row.time),
+                datasets: [
+                {
+                    label: 'Acceleration (m/s^2) over time',
+                    data: data.map(row => row.a)
+                }
+                ]
+            },
+            options:{}
+        });
+        new Chart("Velocity", {
+            type: "line",
+            data: {
+                labels: data.map(row => row.time),
+                datasets: [
+                {
+                    label: 'Velocity (m/s) over time',
+                    data: data.map(row => row.v)
+                }
+                ]
+            },
+            options:{}
+        });
+    }
   </script>
 </body>
 </html>
