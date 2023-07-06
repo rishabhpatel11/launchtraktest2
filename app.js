@@ -1,7 +1,12 @@
+'use strict';
 const express = require('express');
 const app = express();
 const path = require('path');
 const mysql = require('mysql');
+
+app.set('view engine', 'pug');
+app.use('/static', express.static('public'));
+//app.use(express.static(path.join(__dirname, 'public')));
 
 const connection = mysql.createConnection({
   host: "database-2.cqn8cvpne99t.us-east-1.rds.amazonaws.com",
@@ -43,7 +48,6 @@ var bodyParser = require('body-parser');
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
-app.use(express.static(path.join(__dirname, 'public')));
  
 app.get("/", (req, res) => {
  res.sendFile(path.join(__dirname+'/index.html'));
