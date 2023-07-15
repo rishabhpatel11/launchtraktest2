@@ -55,81 +55,103 @@ app.get("/", (req, res) => {
 
 app.post("/", (req, res) => {
     if(req.body.data != undefined){
-    console.log(req.body.data);
-    var data=[];
-    var temp=[];
-    var dataArray = req.body.data.split('\n');
-    for(let i = 0; i < dataArray.length - 5; i++){
-        var lineArray = dataArray[i].split(',');
-        //console.log(lineArray.length);
-        let d = 0;
-        if(lineArray.length > 11){
-            if(lineArray[0].match(/^\d/)){
-                let accel = Math.sqrt(lineArray[4]*lineArray[4] + lineArray[5]*lineArray[5] + lineArray[6]*lineArray[6]);
-                if(lineArray[4] < 0 ){
-                    accel *= -1;
-                }
-                let prevVelocity = 0;
-                if(d > 0){
-                    prevVelocity = data[d - 1].v;
-                }
-                data.push(
-                    {
-                    time : lineArray[0]/1000000,
-                    roll : lineArray[1],
-                    pitch: lineArray[2],
-                    yaw : lineArray[3],
-                    ax : lineArray[4],
-                    ay : lineArray[5],
-                    az : lineArray[6],
-                    press : lineArray[7],
-                    temp : lineArray[8],
-                    hgx: lineArray[9],
-                    hgy : lineArray[10],
-                    hgz : lineArray[11],
-                    acc : accel,
-                    vel : accel*lineArray[0]/1000000 + prevVelocity, 
-                    altitude : ((Math.pow((1013.25/(lineArray[7]/100)), (1/5.257)) - 1.0) * (lineArray[8] + 273.15)),
-                    }
-                )
-                if(d == 0){
-                    temp.push(lineArray[0]/1000000);
-                    for(let t = 1; t < 12; t++){
-                        temp.push(lineArray[t]/1000000);
-                    }
-                }
-                d = d + 1;
+      console.log(req.body.title);
+      console.log(req.body.data);
+      if(req.body.title == -1){
+        let sql = "SELECT DISTINCT name FROM uid;";
+        connection.connect(function(err) {
+          if (err) {
+            return console.error('error: ' + err.message);
+          }
+          console.log('Connected to the MySQL server.');
+          connection.query(sql, function(err, results, fields) {
+            if (err) {
+              console.log(err.message);
             }
-        }
-    }
-    let createTable = "CREATE TABLE IF NOT EXISTS `uid` (`time` DOUBLE, `roll` DOUBLE, `pitch` DOUBLE, `yaw` DOUBLE, `ax` DOUBLE, `ay` DOUBLE, `az` DOUBLE, `press` DOUBLE, `temp` DOUBLE, `hgx` DOUBLE, `hgy` DOUBLE, `hyz` DOUBLE) ENGINE=InnoDB DEFAULT CHARSET=latin1;"
-    let insertTable = "INSERT INTO `uid` (`time`, `roll`, `pitch`, `yaw`, `ax`, `ay`, `az`, `press`, `temp`, `hgx`, `hgy`, `hyz`) VALUES ('" + temp[0] + "', '" + temp[1] + "', '" + temp[2] + "', '" + temp[3] + "', '" + temp[4] + "', '" + temp[5] + "', '" + temp[6] + "', '" + temp[7] + "', '" + temp[8] + "', '" + temp[9] + "', '" + temp[10] + "', '" + temp[11] + "');"
-    connection.connect(function(err) {
-        if (err) {
-          return console.error('error: ' + err.message);
-        }
-        console.log('Connected to the MySQL server.');
-        connection.query(createTable, function(err, results, fields) {
-          if (err) {
-            console.log(err.message);
-          }
-          console.log("Table Created");
+            console.log("Got filenames");
+            console.log(results);
+          });
+          connection.end(function(err) {
+            if (err) {
+              return console.log(err.message);
+            }
+          });
         });
-        for(let i = 0; i < 100; i++){
-            insertTable = "INSERT INTO `uid` (`time`, `roll`, `pitch`, `yaw`, `ax`, `ay`, `az`, `press`, `temp`, `hgx`, `hgy`, `hyz`) VALUES ('" + data[i].time + "', '" + data[i].roll + "', '" + data[i].pitch + "', '" + data[i].yaw + "', '" + data[i].ax + "', '" + data[i].ay + "', '" + data[i].az + "', '" + data[i].press + "', '" + data[i].temp + "', '" + data[i].hgx + "', '" + data[i].hgy + "', '" + data[i].hgz + "');"
-            connection.query(insertTable, function(err, results, fields) {
-                if (err) {
-                console.log(err.message);
-                }
-                console.log("Table Created");
-            });
-        }
-        connection.end(function(err) {
-          if (err) {
-            return console.log(err.message);
+      }
+      var data=[];
+      var temp=[];
+      var dataArray = req.body.data.split('\n');
+      for(let i = 0; i < dataArray.length - 5; i++){
+          var lineArray = dataArray[i].split(',');
+          //console.log(lineArray.length);
+          let d = 0;
+          if(lineArray.length > 11){
+              if(lineArray[0].match(/^\d/)){
+                  let accel = Math.sqrt(lineArray[4]*lineArray[4] + lineArray[5]*lineArray[5] + lineArray[6]*lineArray[6]);
+                  if(lineArray[4] < 0 ){
+                      accel *= -1;
+                  }
+                  let prevVelocity = 0;
+                  if(d > 0){
+                      prevVelocity = data[d - 1].v;
+                  }
+                  data.push(
+                      {
+                      time : lineArray[0]/1000000,
+                      roll : lineArray[1],
+                      pitch: lineArray[2],
+                      yaw : lineArray[3],
+                      ax : lineArray[4],
+                      ay : lineArray[5],
+                      az : lineArray[6],
+                      press : lineArray[7],
+                      temp : lineArray[8],
+                      hgx: lineArray[9],
+                      hgy : lineArray[10],
+                      hgz : lineArray[11],
+                      acc : accel,
+                      vel : accel*lineArray[0]/1000000 + prevVelocity, 
+                      altitude : ((Math.pow((1013.25/(lineArray[7]/100)), (1/5.257)) - 1.0) * (lineArray[8] + 273.15)),
+                      }
+                  )
+                  if(d == 0){
+                      temp.push(lineArray[0]/1000000);
+                      for(let t = 1; t < 12; t++){
+                          temp.push(lineArray[t]/1000000);
+                      }
+                  }
+                  d = d + 1;
+              }
           }
+      }
+      let createTable = "CREATE TABLE IF NOT EXISTS `uid` (`time` DOUBLE, `roll` DOUBLE, `pitch` DOUBLE, `yaw` DOUBLE, `ax` DOUBLE, `ay` DOUBLE, `az` DOUBLE, `press` DOUBLE, `temp` DOUBLE, `hgx` DOUBLE, `hgy` DOUBLE, `hyz` DOUBLE, `name` VARCHAR(30)) ENGINE=InnoDB DEFAULT CHARSET=latin1;"
+      let insertTable = "INSERT INTO `uid` (`time`, `roll`, `pitch`, `yaw`, `ax`, `ay`, `az`, `press`, `temp`, `hgx`, `hgy`, `hyz`, `name`) VALUES ('" + temp[0] + "', '" + temp[1] + "', '" + temp[2] + "', '" + temp[3] + "', '" + temp[4] + "', '" + temp[5] + "', '" + temp[6] + "', '" + temp[7] + "', '" + temp[8] + "', '" + temp[9] + "', '" + temp[10] + "', '" + temp[11] + "', '" + req.body.title + "');"
+      connection.connect(function(err) {
+          if (err) {
+            return console.error('error: ' + err.message);
+          }
+          console.log('Connected to the MySQL server.');
+          connection.query(createTable, function(err, results, fields) {
+            if (err) {
+              console.log(err.message);
+            }
+            console.log("Table Created");
+          });
+          for(let i = 0; i < 100; i++){
+              insertTable = "INSERT INTO `uid` (`time`, `roll`, `pitch`, `yaw`, `ax`, `ay`, `az`, `press`, `temp`, `hgx`, `hgy`, `hyz`, `name`) VALUES ('" + data[i].time + "', '" + data[i].roll + "', '" + data[i].pitch + "', '" + data[i].yaw + "', '" + data[i].ax + "', '" + data[i].ay + "', '" + data[i].az + "', '" + data[i].press + "', '" + data[i].temp + "', '" + data[i].hgx + "', '" + data[i].hgy + "', '" + data[i].hgz + "', '" + req.body.title + "');"
+              connection.query(insertTable, function(err, results, fields) {
+                  if (err) {
+                  console.log(err.message);
+                  }
+                  console.log("Table Created");
+              });
+          }
+          connection.end(function(err) {
+            if (err) {
+              return console.log(err.message);
+            }
+          });
         });
-      });
     }
     res.sendFile(path.join(__dirname+'/index.html'));
 });
