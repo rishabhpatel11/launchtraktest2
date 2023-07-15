@@ -37,11 +37,7 @@ Baud:
     <datalist id="filenames"></datalist>
 
     <button onclick="viewFileData()">
-        Load Data
-    </button>
-    
-    <button onclick="downloadFileData()">
-        Download Data
+        Load Data From File
     </button>
     <button onclick="clearData()">Clear Data</button>
     <button onclick="viewTable()">
@@ -53,21 +49,27 @@ Baud:
     <button onclick="loadGraph()">
         View Graph
     </button>
+    <button onclick="downloadFileData()">
+        Upload Data to Database
+    </button>
 </div>
 <br>
 <table>
 </table>
 
-<script src="serial.js"></script>
+<script src="./js/serial.js"></script>
 
-<div>
-    <canvas id="Acceleration"></canvas>
-    <canvas id="Velocity"></canvas>
-    <canvas id="Altitude"></canvas>
-  </div>
+<div class = "wrapper">
+    <div id="Thrust" style="height: 300px; width: 100%;"></div>
+    <div id="ExhaustVelocity" style="height: 300px; width: 100%;"></div>
+    <div id="Pressure" style="height: 300px; width: 100%;"></div>
+    <div id="Mass" style="height: 300px; width: 100%;"></div>
+    <div id="Acceleration" style="height: 300px; width: 100%;"></div>
+    <div id="Velocity" style="height: 300px; width: 100%;"></div>
+    <div id="Height" style="height: 300px; width: 100%;"></div>
+</div>
   
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="graph.js"></script>
-  
+  <script src="https://cdn.canvasjs.com/ga/canvasjs.min.js"></script>
+  <script src="./js/graph.js"></script>
 </body>
 </html>

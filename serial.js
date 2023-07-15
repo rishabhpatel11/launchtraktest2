@@ -1,4 +1,4 @@
-var port, textEncoder, writableStreamClosed, writer = -1;
+    var port, textEncoder, writableStreamClosed, writer = -1;
     // 0 = Load Files, 1 = Open File
     var mode = 0;
     const filenames = [];
@@ -58,70 +58,38 @@ var port, textEncoder, writableStreamClosed, writer = -1;
         //currentDataString = serialResultsDiv.innerText;
         currentDataString = rawData;
         console.log("Done Loading Data");
-        document.getElementById("dataHolder").innerHTML = currentDataString;
-    }
-    async function openFile(){
-        dataToSend = localStorage.filename;
-        dataToSend = dataToSend.substring(3,6);
-        dataToSend = dataToSend + "\r";
-        //appendToTerminal("> " + dataToSend);
-        await writer.write(dataToSend);
-        if (dataToSend.trim().startsWith('\x03')) echo(false);
-    }
-    async function dumpFile(){
-        dataToSend = "H";
-        dataToSend = dataToSend + "\r";
-        //appendToTerminal("> " + dataToSend);
-        await writer.write(dataToSend);
-        if (dataToSend.trim().startsWith('\x03')) echo(false);
-    }
-    async function downloadFileData(){
-        //await save(localStorage.filename + ".txt",currentDataString);
-        const body = {
-            userId: 1,
-            title: "test",
-            data: currentDataString,
-            completed: false
-        };
-        $.post("/", body, (data, status) => {
-            console.log(data);
-        });
-    }
-    function save(filename, data) {
-        const blob = new Blob([data], {type: 'text/csv'});
-        if(window.navigator.msSaveOrOpenBlob) {
-            window.navigator.msSaveBlob(blob, filename);
-        }
-        else{
-            const elem = window.document.createElement('a');
-            elem.href = window.URL.createObjectURL(blob);
-            elem.download = filename;        
-            document.body.appendChild(elem);
-            elem.click();        
-            document.body.removeChild(elem);
-        }
-    }
-    async function viewTable(){
-        console.log("generate table");
-        let table = document.querySelector("table");
+        //document.getElementById("dataHolder").innerHTML = currentDataString;
         //var dataArray = document.getElementById("serialResults").innerText.split('\n');
         var dataArray = rawData.split('\n');
         console.log(dataArray.length);
         console.log(dataArray[20]);
+        var initial_acceleration = [0,0,0];
         for(let i = 0; i < dataArray.length - 5; i++){
                 var lineArray = dataArray[i].split(',');
                 //console.log(lineArray.length);
                 let d = 0;
                 if(lineArray.length > 11){
                     if(lineArray[0].match(/^\d/)){
+                        // Thrust = velocity * (change mass/change time)
+                        // Exhaust Velocity = 
+                        // Pressure
+                        // Mass
+                        // Acceleration = sqrt(ax^2 + ay^2 + az^2)
+                        if(d == 0){
+                            initial_acceleration[0] = lineArray[4];
+                            initial_acceleration[1] = lineArray[4];
+                            initial_acceleration[2] = lineArray[4];
+                        }
                         let accel = Math.sqrt(lineArray[4]*lineArray[4] + lineArray[5]*lineArray[5] + lineArray[6]*lineArray[6]);
                         if(lineArray[4] < 0 ){
                             accel *= -1;
                         }
+                        // Velocity
                         let prevVelocity = 0;
                         if(d > 0){
                             prevVelocity = data[d - 1].v;
                         }
+                        // Height
                         data.push(
                             {
                             time : lineArray[0]/1000000,
@@ -147,6 +115,63 @@ var port, textEncoder, writableStreamClosed, writer = -1;
             }
         console.log("Data length: " + data.length);
         console.log(data[0]);
+    }
+    async function openFile(){
+        dataToSend = localStorage.filename;
+        dataToSend = dataToSend.substring(3,6);
+        dataToSend = dataToSend + "\r";
+        //appendToTerminal("> " + dataToSend);
+        await writer.write(dataToSend);
+        if (dataToSend.trim().startsWith('\x03')) echo(false);
+    }
+    async function dumpFile(){
+        dataToSend = "H";
+        dataToSend = dataToSend + "\r";
+        //appendToTerminal("> " + dataToSend);
+        await writer.write(dataToSend);
+        if (dataToSend.trim().startsWith('\x03')) echo(false);
+    }
+    async function downloadFileData(){
+        //await save(localStorage.filename + ".txt",currentDataString);
+        let dbfilename = prompt("Enter a filename");
+        const body = {
+            userId: 1,
+            title: dbfilename,
+            data: currentDataString,
+            completed: false
+        };
+        $.post("/", body, (data, status) => {
+            console.log(data);
+        });
+    }
+    async function getDatabaseFilenames(){
+        const body = {
+            userId: 1,
+            title: -1,
+            data: [],
+            completed: false
+        };
+        $.post("/", body, (data, status) => {
+            console.log(data);
+        });
+    }
+    function save(filename, data) {
+        const blob = new Blob([data], {type: 'text/csv'});
+        if(window.navigator.msSaveOrOpenBlob) {
+            window.navigator.msSaveBlob(blob, filename);
+        }
+        else{
+            const elem = window.document.createElement('a');
+            elem.href = window.URL.createObjectURL(blob);
+            elem.download = filename;        
+            document.body.appendChild(elem);
+            elem.click();        
+            document.body.removeChild(elem);
+        }
+    }
+    async function viewTable(){
+        console.log("generate table");
+        let table = document.querySelector("table");
         generateTableHead(table, Object.keys(data[0]))
         generateTable(table, data);
     }
