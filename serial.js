@@ -7,10 +7,12 @@
     var currentDataString = "";
     var data = [];
     var rawData = "";
+    var localText = "";
     async function connectSerial() {
         try {
             port = await navigator.serial.requestPort();
-            await port.open({ baudRate: document.getElementById("baud").value });
+            //await port.open({ baudRate: document.getElementById("baud").value });
+            await port.open({ baudRate: 115200 });
             let settings = {};
 
             settings.dataTerminalReady = true;
@@ -61,60 +63,7 @@
         //document.getElementById("dataHolder").innerHTML = currentDataString;
         //var dataArray = document.getElementById("serialResults").innerText.split('\n');
         var dataArray = rawData.split('\n');
-        console.log(dataArray.length);
-        console.log(dataArray[20]);
-        var initial_acceleration = [0,0,0];
-        for(let i = 0; i < dataArray.length - 5; i++){
-                var lineArray = dataArray[i].split(',');
-                //console.log(lineArray.length);
-                let d = 0;
-                if(lineArray.length > 11){
-                    if(lineArray[0].match(/^\d/)){
-                        // Thrust = velocity * (change mass/change time)
-                        // Exhaust Velocity = 
-                        // Pressure
-                        // Mass
-                        // Acceleration = sqrt(ax^2 + ay^2 + az^2)
-                        if(d == 0){
-                            initial_acceleration[0] = lineArray[4];
-                            initial_acceleration[1] = lineArray[4];
-                            initial_acceleration[2] = lineArray[4];
-                        }
-                        let accel = Math.sqrt(lineArray[4]*lineArray[4] + lineArray[5]*lineArray[5] + lineArray[6]*lineArray[6]);
-                        if(lineArray[4] < 0 ){
-                            accel *= -1;
-                        }
-                        // Velocity
-                        let prevVelocity = 0;
-                        if(d > 0){
-                            prevVelocity = data[d - 1].v;
-                        }
-                        // Height
-                        data.push(
-                            {
-                            time : lineArray[0]/1000000,
-                            roll : lineArray[1],
-                            pitch: lineArray[2],
-                            yaw : lineArray[3],
-                            ax : lineArray[4],
-                            ay : lineArray[5],
-                            az : lineArray[6],
-                            press : lineArray[7],
-                            temp : lineArray[8],
-                            hgx: lineArray[9],
-                            hgy : lineArray[10],
-                            hgz : lineArray[11],
-                            acc : accel,
-                            vel : accel*lineArray[0]/1000000 + prevVelocity, 
-                            altitude : ((Math.pow((1013.25/(lineArray[7]/100)), (1/5.257)) - 1.0) * (lineArray[8] + 273.15)),
-                            }
-                        )
-                        d = d + 1;
-                    }
-                }
-            }
-        console.log("Data length: " + data.length);
-        console.log(data[0]);
+        createDataArray(dataArray);
     }
     async function openFile(){
         dataToSend = localStorage.filename;
@@ -204,6 +153,93 @@
         rawData = '';
         printFile = false;
     }
+    function useLocalData(){
+        var dataArray = localText.split('\n');
+        createDataArray(dataArray);
+
+    }
+    function createDataArray(dataArray){
+        console.log(dataArray.length);
+        console.log(dataArray[20]);
+        var initial_acceleration = [0,0,0];
+        var a_i = 0
+        for(let i = 0; i < dataArray.length - 5; i++){
+                var lineArray = dataArray[i].split(',');
+                //console.log(lineArray.length);
+                let d = 0;
+                if(lineArray.length > 11){
+                    if(lineArray[0].match(/^\d/)){
+
+                        // Acceleration = sqrt(ax^2 + ay^2 + az^2)
+
+                        let x = lineArray[4];
+                        let y = lineArray[5];
+                        let z = lineArray[6];
+                        let pitch = lineArray[2];
+                        let roll = lineArray[1];
+                        let yaw = lineArray[3];
+
+                        // Convert angles to radians
+                        let pitchRad = pitch * Math.PI / 180.0;
+                        let rollRad = roll * Math.PI / 180.0;
+                        let yawRad = yaw * Math.PI / 180.0;
+
+                        // Calculate direction of acceleration
+                        let accX = x * Math.cos(pitchRad) * Math.cos(yawRad) + y * (Math.cos(rollRad) * Math.sin(pitchRad) * Math.cos(yawRad) - Math.sin(rollRad) * Math.sin(yawRad)) + z * (Math.sin(rollRad) * Math.sin(yawRad) + Math.cos(rollRad) * Math.sin(pitchRad) * Math.cos(yawRad));
+                        let accY = x * Math.cos(pitchRad) * Math.sin(yawRad) + y * (Math.cos(rollRad) * Math.sin(pitchRad) * Math.sin(yawRad) + Math.sin(rollRad) * Math.cos(yawRad)) + z * (-Math.sin(rollRad) * Math.cos(yawRad) + Math.cos(rollRad) * Math.sin(pitchRad) * Math.sin(yawRad));
+                        let accZ = -x * Math.sin(pitchRad) + y * Math.sin(rollRad) * Math.cos(pitchRad) + z * Math.cos(rollRad) * Math.cos(pitchRad);
+                        let accel = Math.sqrt(accX*accX + accY*accY + accZ*accZ);
+
+                        // Velocity
+                        let prevVelocity = 0;
+                        if(d > 0){
+                            prevVelocity = data[d - 1].v;
+                        }
+                        // Height
+                        data.push(
+                            {
+                            time : lineArray[0]/1000000,
+                            roll : lineArray[1],
+                            pitch: lineArray[2],
+                            yaw : lineArray[3],
+                            ax : lineArray[4],
+                            ay : lineArray[5],
+                            az : lineArray[6],
+                            press : lineArray[7],
+                            temp : lineArray[8],
+                            hgx: lineArray[9],
+                            hgy : lineArray[10],
+                            hgz : lineArray[11],
+                            acc : accel,
+                            vel : accel*lineArray[0]/1000000 + prevVelocity, 
+                            altitude : ((Math.pow((1013.25/(lineArray[7]/100)), (1/5.257)) - 1.0) * (lineArray[8] + 273.15)),
+                            }
+                        )
+                        d = d + 1;
+                    }
+                }
+            }
+        console.log("Data length: " + data.length);
+        console.log(data[0]);
+    }
+    function previewFile() {
+        const [file] = document.querySelector("input[type=file]").files;
+        const reader = new FileReader();
+      
+        reader.addEventListener(
+          "load",
+          () => {
+            // this will then display a text file
+            localText = reader.result;
+            useLocalData();
+          },
+          false,
+        );
+      
+        if (file) {
+          reader.readAsText(file);
+        }
+      }
     async function listenToPort() {
         const textDecoder = new TextDecoderStream();
         const readableStreamClosed = port.readable.pipeTo(textDecoder.writable);
@@ -248,4 +284,4 @@
     async function appendToTerminal(newStuff) {
         rawData += newStuff;
     }
-    document.getElementById("baud").value = (localStorage.baud == undefined ? 115200 : localStorage.baud);
+    //document.getElementById("baud").value = (localStorage.baud == undefined ? 115200 : localStorage.baud);
