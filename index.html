@@ -7,27 +7,6 @@
 </head>
 <body>
 <button class="buttons" id="connectSerial" onclick="connectSerial()">Select Device</button>
-<!-- <div>
-    Baud:
-    <input type="text" id="baud" list="baudList" placeholder = "115200" style="width: 10ch;" onclick="this.value = ''"
-        onchange="localStorage.baud = this.value">
-    <datalist id="baudList">
-        <option value="110">110</option>
-        <option value="300">300</option>
-        <option value="600">600</option>
-        <option value="1200">1200</option>
-        <option value="2400">2400</option>
-        <option value="4800">4800</option>
-        <option value="9600">9600</option>
-        <option value="14400">14400</option>
-        <option value="19200">19200</option>
-        <option value="38400">38400</option>
-        <option value="57600">57600</option>
-        <option value="115200">115200</option>
-        <option value="128000">128000</option>
-        <option value="256000">256000</option>
-    </datalist>
-</div> -->
 <br>
 <div id = "commands">
     <button class="buttons" id = "refreshButton" onclick="refreshFiles()">
@@ -62,10 +41,7 @@
 <script src="serial.js"></script>
 
 <div class = "wrapper">
-    <div id="Thrust" style="height: 300px; width: 100%;"></div>
-    <div id="ExhaustVelocity" style="height: 300px; width: 100%;"></div>
     <div id="Pressure" style="height: 300px; width: 100%;"></div>
-    <div id="Mass" style="height: 300px; width: 100%;"></div>
     <div id="Acceleration" style="height: 300px; width: 100%;"></div>
     <div id="Velocity" style="height: 300px; width: 100%;"></div>
     <div id="Height" style="height: 300px; width: 100%;"></div>

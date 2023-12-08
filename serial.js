@@ -8,6 +8,7 @@
     var data = [];
     var rawData = "";
     var localText = "";
+    var valuesOfInterest = [];
     async function connectSerial() {
         try {
             port = await navigator.serial.requestPort();
@@ -161,14 +162,39 @@
     function createDataArray(dataArray){
         console.log(dataArray.length);
         console.log(dataArray[20]);
-        var initial_acceleration = [0,0,0];
-        var a_i = 0
+        var initial_acceleration = 0;
+        var a_i = 0;
+        var initial_altitude = 0;
+        var d = 0;
+        var start_thrust_time = 0;
+        var end_thrust_time = 0;
+        var started_thrust = false;
+        var ended_thrust = false;
+        var thrust_time = 0;
+        var previous_time = 0.0;
+        var previous_acceleration = 0.0;
+        var velocity = 0.0;
+        var coast_time = 0.0;
+        var apogee_time = 0.0;
+        var apogee_altitude = 0.0;
+        var max_altitude = 0;
+        var min_altitude = 0;
+        var max_altitude_time = 0;
+        var max_thrust = 0;
+        var avg_thrust = 0;
+        var avg_thrust_count = 0;
+        var max_highG_accel_mag = 0;
+        var total_flight_time = 0;
+        var end_of_flight_time = 0;
+        var top_speed = 0;
+        var decent_speed = 0;
         for(let i = 0; i < dataArray.length - 5; i++){
                 var lineArray = dataArray[i].split(',');
                 //console.log(lineArray.length);
-                let d = 0;
                 if(lineArray.length > 11){
                     if(lineArray[0].match(/^\d/)){
+
+                        var current_time = lineArray[0]/1000000;
 
                         // Acceleration = sqrt(ax^2 + ay^2 + az^2)
 
@@ -188,14 +214,83 @@
                         let accX = x * Math.cos(pitchRad) * Math.cos(yawRad) + y * (Math.cos(rollRad) * Math.sin(pitchRad) * Math.cos(yawRad) - Math.sin(rollRad) * Math.sin(yawRad)) + z * (Math.sin(rollRad) * Math.sin(yawRad) + Math.cos(rollRad) * Math.sin(pitchRad) * Math.cos(yawRad));
                         let accY = x * Math.cos(pitchRad) * Math.sin(yawRad) + y * (Math.cos(rollRad) * Math.sin(pitchRad) * Math.sin(yawRad) + Math.sin(rollRad) * Math.cos(yawRad)) + z * (-Math.sin(rollRad) * Math.cos(yawRad) + Math.cos(rollRad) * Math.sin(pitchRad) * Math.sin(yawRad));
                         let accZ = -x * Math.sin(pitchRad) + y * Math.sin(rollRad) * Math.cos(pitchRad) + z * Math.cos(rollRad) * Math.cos(pitchRad);
-                        let accel = Math.sqrt(accX*accX + accY*accY + accZ*accZ);
+                        var accel = Math.sqrt(x*x + y*y + z*z);
+
+                        if(pitchRad < 0 ){
+                            accel *= -1;
+                        }
+
+                        if(d == 0){
+                            initial_acceleration = accel;
+                        }
+                        
 
                         // Velocity
-                        let prevVelocity = 0;
-                        if(d > 0){
-                            prevVelocity = data[d - 1].v;
+                        var deltaTime = current_time - previous_time;
+                        var deltaV = (deltaTime/2.0)*(previous_acceleration + accel);
+                        velocity += deltaV;
+
+
+                        // Altitude
+                        var seaLevelPressure = 101325.0
+                        var pressure = lineArray[7];
+                        var temperature = parseFloat(lineArray[8]);
+                        //let altitude = ((39.37 + 273.15)/.0065);
+                        var altitude = ((1.0 - Math.pow((pressure / seaLevelPressure), (1.0 / 5.257))) * ((temperature + 273.15)/.0065));
+                        if(d == 0){
+                            initial_altitude = altitude;
+                            console.log("Initial Altitude: " + initial_altitude);
                         }
-                        // Height
+                        altitude -= initial_altitude;
+
+                        // Points of Interest
+
+                        // Thrust Time
+                        if( accel > 15.0 && !started_thrust){
+                            start_thrust_time = current_time;
+                            started_thrust = true;
+                        }
+
+                        if(started_thrust && !ended_thrust){
+                            if(Math.abs(accel) > max_thrust){
+                                max_thrust = Math.abs(accel);
+                            }
+                            avg_thrust = avg_thrust + Math.abs(accel);
+                            avg_thrust_count = avg_thrust_count + 1;
+                            if(accel < 9.80 ){
+                                end_thrust_time = current_time;
+                                console.log("Start thrust time: " + start_thrust_time);
+                                console.log("End thrust time: " + end_thrust_time);
+                                console.log("Total thrust time: " + (end_thrust_time - start_thrust_time));
+                                ended_thrust = true;
+                                thrust_time = end_thrust_time - start_thrust_time;
+
+                                avg_thrust = avg_thrust / avg_thrust_count;
+                            }
+                        }
+
+                        // Apogee Altitude
+                        if(d == 0){
+                            min_altitude = altitude;
+                        }
+                        if(thrust_time > 0){
+                            if(altitude > max_altitude){
+                                max_altitude = altitude;
+                                max_altitude_time = current_time;
+                            }
+                        }
+
+                        // Max High G Accel Magnitude
+                        var hgx = lineArray[9];
+                        var hgy = lineArray[10];
+                        var hgz = lineArray[11];
+                        var highG_accel_mag = Math.sqrt((hgx*hgx) + (hgy*hgy) + (hgz*hgz));
+                        if(highG_accel_mag > max_highG_accel_mag){
+                            max_highG_accel_mag = highG_accel_mag;
+                            end_of_flight_time = current_time;
+                        }
+
+
                         data.push(
                             {
                             time : lineArray[0]/1000000,
@@ -211,14 +306,22 @@
                             hgy : lineArray[10],
                             hgz : lineArray[11],
                             acc : accel,
-                            vel : accel*lineArray[0]/1000000 + prevVelocity, 
-                            altitude : ((Math.pow((1013.25/(lineArray[7]/100)), (1/5.257)) - 1.0) * (lineArray[8] + 273.15)),
+                            vel : velocity, 
+                            altitude : altitude,
                             }
                         )
                         d = d + 1;
+                        previous_acceleration = accel;
+                        previous_time = lineArray[0]/1000000;
                     }
                 }
             }
+        decent_speed = apogee_altitude / (total_flight_time - apogee_time);
+        top_speed = avg_thrust*thrust_time;
+        total_flight_time = end_of_flight_time - start_thrust_time;
+        apogee_altitude = max_altitude - min_altitude;
+        apogee_time = max_altitude_time - start_thrust_time;
+        coast_time = apogee_time - thrust_time;
         console.log("Data length: " + data.length);
         console.log(data[0]);
     }
@@ -229,7 +332,6 @@
         reader.addEventListener(
           "load",
           () => {
-            // this will then display a text file
             localText = reader.result;
             useLocalData();
           },
@@ -245,11 +347,9 @@
         const readableStreamClosed = port.readable.pipeTo(textDecoder.writable);
         const reader = textDecoder.readable.getReader();
 
-        // Listen to data coming from the serial device.
         while (true) {
             const { value, done } = await reader.read();
             if (done) {
-                // Allow the serial port to be closed later.
                 console.log('[readLoop] DONE', done);
                 reader.releaseLock();
                 break;
